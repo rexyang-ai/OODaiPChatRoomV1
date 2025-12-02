@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>聊天室 - 局域网聊天室</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#A7C7E7',
+                        secondary: '#F5F5DC',
+                        accent: '#8EC5FC',
+                        dark: '#4A6FA5',
+                        light: '#F9FBFD',
+                        success: '#4CAF50',
+                        warning: '#FFC107',
+                        danger: '#F44336',
+                        info: '#2196F3'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif']
+                    }
+                }
+            }
+        };
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .scrollbar-hide {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+            .chat-bubble-left {
+                border-radius: 18px 18px 18px 0;
+            }
+            .chat-bubble-right {
+                border-radius: 18px 18px 0 18px;
+            }
+            /* Custom Scrollbar */
+            ::-webkit-scrollbar {
+                width: 6px;
+                height: 6px;
+            }
+            ::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            ::-webkit-scrollbar-thumb {
+                background: #cbd5e1;
+                border-radius: 3px;
+            }
+            ::-webkit-scrollbar-thumb:hover {
+                background: #94a3b8;
+            }
+        }
+    </style>
+</head>
+<body class="bg-secondary h-screen font-sans text-gray-800 flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-primary/90 backdrop-blur-sm shadow-sm sticky top-0 z-50 h-16 flex-none">
+        <div class="container mx-auto px-4 h-full flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-md">
+                    <i class="fas fa-comments text-primary text-xl"></i>
+                </div>
+                <h1 class="text-xl font-bold text-white">局域网聊天室</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="text-white font-medium hidden sm:block">欢迎, {{ nickname }}</span>
+                <button id="logout-btn" class="px-4 py-2 bg-white/20 rounded-full text-white hover:bg-white/30 transition-colors text-sm">
+                    <i class="fas fa-sign-out-alt mr-1"></i> 退出
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 flex overflow-hidden relative">
+        <!-- Sidebar (Optional/Responsive) -->
+        <aside class="w-64 bg-white shadow-md z-40 flex-col hidden md:flex border-r border-gray-100">
+            <div class="p-4 border-b border-gray-100">
+                <h3 class="font-semibold text-gray-700">在线用户</h3>
+            </div>
+            <div id="user-list" class="flex-1 overflow-y-auto p-2 space-y-2">
+                <!-- User List will be populated here -->
+            </div>
+        </aside>
+
+        <!-- Chat Area -->
+        <section class="flex-1 flex flex-col bg-light overflow-hidden relative w-full">
+            <!-- Chat Header -->
+            <div class="bg-white shadow-sm p-4 flex items-center justify-between border-b border-gray-100 flex-none">
+                <div class="flex items-center">
+                    <h2 class="font-medium text-gray-900">公共聊天室</h2>
+                </div>
+                <div class="flex space-x-2 text-gray-500">
+                    <button class="p-2 hover:bg-gray-100 rounded-full" title="历史记录 (建设中)" onclick="alert('历史记录功能正在建设中...')">
+                        <i class="fas fa-history"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Messages -->
+            <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                <!-- System Message Example -->
+                <div class="text-center my-4">
+                    <span class="px-3 py-1 rounded-full bg-gray-200 text-xs text-gray-500">欢迎加入聊天室</span>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="bg-white border-t border-gray-100 p-4 flex-none relative">
+                <!-- Emoji Picker -->
+                <div id="emoji-picker" class="hidden absolute bottom-full left-4 mb-2 bg-white border border-gray-200 shadow-lg rounded-lg p-2 w-64 max-h-60 overflow-y-auto z-50 grid grid-cols-6 gap-2">
+                    <!-- Emojis will be populated by JS -->
+                </div>
+
+                <!-- Toolbar -->
+                <div class="flex space-x-4 mb-3 text-gray-500 px-1">
+                    <button id="emoji-btn" class="hover:text-primary transition-colors"><i class="far fa-smile text-xl"></i></button>
+                    <button class="hover:text-primary transition-colors" onclick="insertText('@成小理 ')">@成小理</button>
+                    <button class="hover:text-primary transition-colors" onclick="insertText('@音乐一下 ')">@音乐一下</button>
+                    <button class="hover:text-primary transition-colors" onclick="insertText('@电影 ')">@电影</button>
+                    <button class="hover:text-primary transition-colors" onclick="insertText('@天气 ')">@天气</button>
+                    <button class="hover:text-primary transition-colors" onclick="insertText('@新闻 ')">@新闻</button>
+                    <button class="hover:text-primary transition-colors" onclick="insertText('@小视频 ')">@小视频</button>
+                </div>
+                
+                <!-- Input Form -->
+                <form id="message-form" class="flex items-end space-x-3">
+                    <div class="flex-1 bg-gray-100 rounded-2xl p-3 focus-within:ring-2 focus-within:ring-primary/50 transition-all">
+                        <textarea id="message-input" rows="1" class="w-full bg-transparent border-none focus:ring-0 resize-none max-h-32 focus:outline-none" placeholder="输入消息..." required></textarea>
+                    </div>
+                    <button type="submit" class="w-12 h-12 bg-primary text-white rounded-full flex items-center justify-center hover:bg-primary/90 transition-colors shadow-md transform hover:scale-105">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/jquery-3.7.1.min.js') }}"></script>
+    <script>
+        const socket = io();
+        const nickname = "{{ nickname }}";
+
+        // Join Room
+        socket.on('connect', () => {
+            socket.emit('join', {nickname: nickname});
+        });
+
+        // Login Error
+        socket.on('login_error', (data) => {
+            alert(data.message);
+            window.location.href = '/';
+        });
+
+        // Receive Message
+        socket.on('message', (data) => {
+            appendMessage(data);
+        });
+
+        // System Message
+        socket.on('system_message', (data) => {
+            appendSystemMessage(data.msg);
+        });
+
+        // AI Message Start
+        socket.on('ai_message_start', (data) => {
+            const html = `
+                <div class="flex justify-start mb-4 animate-fade-in-up" id="msg-${data.id}">
+                    <div class="w-8 h-8 rounded-full bg-indigo-500 text-white flex items-center justify-center mr-2 text-xs overflow-hidden flex-none shadow-md">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div class="max-w-[70%]">
+                        <div class="flex items-baseline space-x-2 mb-1 text-left">
+                            <span class="text-xs text-gray-500 font-medium">${data.nickname}</span>
+                            <span class="text-[10px] text-gray-400">${data.time}</span>
+                        </div>
+                        <div class="bg-white text-gray-800 shadow-sm chat-bubble-left px-4 py-2 text-sm break-words ai-content">
+                            <span class="typing-indicator text-gray-400 animate-pulse">正在思考...</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            $('#messages').append(html);
+            scrollToBottom();
+        });
+
+        // AI Message Chunk
+        socket.on('ai_message_chunk', (data) => {
+            const container = $(`#msg-${data.id} .ai-content`);
+            if (container.length) {
+                if (container.find('.typing-indicator').length) {
+                    container.empty();
+                }
+                // Append text safely
+                container[0].appendChild(document.createTextNode(data.chunk));
+                scrollToBottom();
+            }
+        });
+
+        // AI Message End
+        socket.on('ai_message_end', (data) => {
+            const container = $(`#msg-${data.id} .ai-content`);
+            if (container.length && container.find('.typing-indicator').length) {
+                container.empty();
+            }
+        });
+
+        // Video Message
+        socket.on('video_message', (data) => {
+            const html = `
+                <div class="flex justify-start mb-4 animate-fade-in-up">
+                    <div class="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center mr-2 text-xs overflow-hidden flex-none shadow-md">
+                        <i class="fas fa-film"></i>
+                    </div>
+                    <div class="max-w-[85%] sm:max-w-[450px]">
+                        <div class="flex items-baseline space-x-2 mb-1 text-left">
+                            <span class="text-xs text-gray-500 font-medium">${data.nickname}</span>
+                            <span class="text-[10px] text-gray-400">${data.time}</span>
+                        </div>
+                        <div class="bg-white text-gray-800 shadow-sm chat-bubble-left overflow-hidden p-1">
+                            <iframe src="${data.video_url}" width="400" height="400" frameborder="0" allowfullscreen class="w-full rounded-lg bg-black"></iframe>
+                        </div>
+                    </div>
+                </div>
+            `;
+            $('#messages').append(html);
+            scrollToBottom();
+        });
+
+        // Update User List
+        socket.on('update_user_list', (data) => {
+            const list = $('#user-list');
+            list.empty();
+            data.users.forEach(user => {
+                const isMe = user.nickname === nickname;
+                const item = `
+                    <div class="flex items-center p-2 rounded-lg hover:bg-gray-50 transition-colors cursor-default ${isMe ? 'bg-primary/5 border-l-4 border-primary' : ''}">
+                        <div class="w-8 h-8 rounded-full ${isMe ? 'bg-primary' : 'bg-gray-300'} text-white flex items-center justify-center mr-3 text-xs font-bold">
+                            ${user.nickname[0]}
+                        </div>
+                        <span class="text-sm font-medium text-gray-700 truncate">${user.nickname} ${isMe ? '(我)' : ''}</span>
+                    </div>
+                `;
+                list.append(item);
+            });
+        });
+
+        // Emoji Picker Logic
+        const emojis = [
+            '😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😎','😍','😘','😗','😙','😚','☺','🙂','🤗',
+            '🤩','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥','😮','🤐','😯','😪','😫','😴','😌','😛','😜','😝',
+            '🤤','😒','😓','😔','😕','🙃','🤑','😲','☹','🙁','😖','😞','😟','😤','😢','😭','😦','😧','😨','😩',
+            '🤯','😬','😰','😱','😳','🤪','😵','😡','😠','🤬','😷','🤒','🤕','🤢','🤮','🤧','😇','🤠','🤡','🤥',
+            '🤫','🤭','🧐','🤓','👍','👎','👊','✌','👌','✋','💪','🙏','☝','👆','👇','👈','👉','🖕','👋','🤟',
+            '👏','🙌','👐','🤲','🤝','💅','👂','👃','👣','👀','👁','👅','👄','💋','💘','❤','💓','💔','💕','💖'
+        ];
+        
+        const emojiPicker = $('#emoji-picker');
+        const emojiBtn = $('#emoji-btn');
+
+        // Populate Emojis
+        emojis.forEach(emoji => {
+            const btn = $(`<button class="text-xl hover:bg-gray-100 rounded p-1 transition-colors">${emoji}</button>`);
+            btn.click(function(e) {
+                e.stopPropagation();
+                insertText(emoji);
+                emojiPicker.addClass('hidden');
+            });
+            emojiPicker.append(btn);
+        });
+
+        // Toggle Picker
+        emojiBtn.click(function(e) {
+            e.stopPropagation();
+            emojiPicker.toggleClass('hidden');
+        });
+
+        // Close Picker when clicking outside
+        $(document).click(function() {
+            if (!emojiPicker.hasClass('hidden')) {
+                emojiPicker.addClass('hidden');
+            }
+        });
+
+        // Prevent closing when clicking inside picker
+        emojiPicker.click(function(e) {
+            e.stopPropagation();
+        });
+
+        // Send Message
+        $('#message-form').submit(function(e) {
+            e.preventDefault();
+            const input = $('#message-input');
+            const message = input.val().trim();
+            if (message) {
+                socket.emit('message', {nickname: nickname, msg: message, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})});
+                input.val('');
+                input.focus();
+            }
+        });
+
+        // Handle Enter key to submit
+        $('#message-input').keydown(function(e) {
+            if (e.which == 13 && !e.shiftKey) {
+                e.preventDefault();
+                $('#message-form').submit();
+            }
+        });
+
+        // Logout
+        $('#logout-btn').click(function() {
+            window.location.href = '/';
+        });
+
+        // Helper: Append Message
+        function appendMessage(data) {
+            const isMe = data.nickname === nickname;
+            const alignClass = isMe ? 'justify-end' : 'justify-start';
+            const bubbleClass = isMe ? 'bg-primary text-white chat-bubble-right' : 'bg-white text-gray-800 shadow-sm chat-bubble-left';
+            const metaClass = isMe ? 'text-right' : 'text-left';
+            
+            const html = `
+                <div class="flex ${alignClass} mb-4 animate-fade-in-up">
+                    ${!isMe ? `<div class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center mr-2 text-xs overflow-hidden flex-none">${data.nickname[0]}</div>` : ''}
+                    <div class="max-w-[70%]">
+                        <div class="flex items-baseline space-x-2 mb-1 ${metaClass}">
+                            ${!isMe ? `<span class="text-xs text-gray-500 font-medium">${data.nickname}</span>` : ''}
+                            <span class="text-[10px] text-gray-400">${data.time}</span>
+                        </div>
+                        <div class="${bubbleClass} px-4 py-2 text-sm break-words">
+                            ${data.msg}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            $('#messages').append(html);
+            scrollToBottom();
+        }
+
+        // Helper: Append System Message
+        function appendSystemMessage(msg) {
+            const html = `
+                <div class="text-center my-2">
+                    <span class="px-3 py-1 rounded-full bg-gray-200 text-xs text-gray-500">${msg}</span>
+                </div>
+            `;
+            $('#messages').append(html);
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            const messages = document.getElementById('messages');
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        // Insert Text helper
+        window.insertText = function(text) {
+            const input = $('#message-input');
+            input.val(input.val() + text);
+            input.focus();
+        }
+    </script>
+</body>
+</html>

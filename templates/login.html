@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>登录 - 局域网聊天室</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#A7C7E7',
+                        secondary: '#F5F5DC',
+                        accent: '#8EC5FC',
+                        dark: '#4A6FA5',
+                        light: '#F9FBFD',
+                        success: '#4CAF50',
+                        warning: '#FFC107',
+                        danger: '#F44336',
+                        info: '#2196F3'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif']
+                    }
+                }
+            }
+        };
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .bg-wave {
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='%23A7C7E7' fill-opacity='0.1' d='M0,192L48,181.3C96,171,192,149,288,149.3C384,149,480,171,576,181.3C672,192,768,192,864,181.3C960,171,1056,149,1152,133.3C1248,117,1344,107,1392,101.3L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E");
+                background-repeat: no-repeat;
+                background-position: bottom;
+                background-size: cover;
+            }
+        }
+    </style>
+</head>
+<body class="bg-secondary bg-wave min-h-screen font-sans text-gray-800 flex flex-col items-center justify-center">
+
+    <div class="w-full max-w-md p-6">
+        <div class="bg-white rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:shadow-2xl">
+            <div class="p-8 text-center border-b border-gray-100">
+                <div class="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-comments text-primary text-3xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-800">局域网聊天室</h2>
+                <p class="text-gray-500 mt-2 text-sm">连接到本地网络开始聊天</p>
+            </div>
+            
+            <div class="p-8">
+                <form id="login-form">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">昵称</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-user text-gray-400"></i>
+                            </div>
+                            <input class="w-full border border-gray-300 rounded-lg pl-10 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary" id="nickname" placeholder="输入您的昵称" type="text" required/>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">密码</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-lock text-gray-400"></i>
+                            </div>
+                            <input class="w-full border border-gray-300 rounded-lg pl-10 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary" id="password" placeholder="输入密码" type="password" required/>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">服务器</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-server text-gray-400"></i>
+                            </div>
+                            <select class="w-full border border-gray-300 rounded-lg pl-10 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary appearance-none bg-white" id="server-select" required>
+                                <option value="" disabled selected>选择服务器</option>
+                                {% for server in servers %}
+                                    <option value="{{ server.url }}">{{ server.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                <i class="fas fa-chevron-down text-gray-400"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="w-full py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium text-lg shadow-md hover:shadow-lg transform hover:-translate-y-0.5 duration-200">
+                        连接到聊天室
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/jquery-3.7.1.min.js') }}"></script>
+    <script>
+        $(document).ready(function() {
+            $('#login-form').on('submit', function(e) {
+                e.preventDefault();
+                
+                var nickname = $('#nickname').val();
+                var password = $('#password').val();
+                var server = $('#server-select').val();
+                
+                if (password !== '123456') {
+                    alert('密码错误！');
+                    return;
+                }
+                
+                if (!nickname || !server) {
+                    alert('请填写所有字段');
+                    return;
+                }
+                
+                // Check nickname uniqueness
+                $.post('/check_nickname', {nickname: nickname}, function(response) {
+                    if (response.valid) {
+                        // Redirect to chat page with nickname
+                        window.location.href = '/chat?nickname=' + encodeURIComponent(nickname);
+                    } else {
+                        alert(response.message);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
