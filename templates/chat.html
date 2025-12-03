@@ -237,6 +237,85 @@
             scrollToBottom();
         });
 
+        // Music Message
+        socket.on('music_message', (data) => {
+            const html = `
+                <div class="flex justify-start mb-4 animate-fade-in-up">
+                    <div class="w-8 h-8 rounded-full bg-purple-500 text-white flex items-center justify-center mr-2 text-xs overflow-hidden flex-none shadow-md">
+                        <i class="fas fa-music"></i>
+                    </div>
+                    <div class="max-w-[85%] sm:max-w-[320px]">
+                        <div class="flex items-baseline space-x-2 mb-1 text-left">
+                            <span class="text-xs text-gray-500 font-medium">${data.nickname}</span>
+                            <span class="text-[10px] text-gray-400">${data.time}</span>
+                        </div>
+                        <div class="bg-white text-gray-800 shadow-sm chat-bubble-left overflow-hidden rounded-xl border border-gray-100">
+                            <!-- Music Card -->
+                            <div class="relative group">
+                                <div class="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors"></div>
+                                <img src="${data.image}" alt="Cover" class="w-full h-48 object-cover">
+                                <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 text-white">
+                                    <h3 class="font-bold text-sm truncate">${data.name}</h3>
+                                    <p class="text-xs opacity-90 truncate">${data.singer}</p>
+                                </div>
+                            </div>
+                            <div class="p-3 bg-gray-50">
+                                <audio controls autoplay class="w-full h-8">
+                                    <source src="${data.url}" type="audio/mpeg">
+                                    您的浏览器不支持音频播放。
+                                </audio>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            $('#messages').append(html);
+            scrollToBottom();
+        });
+
+        // Weather Message
+        socket.on('weather_message', (data) => {
+            const html = `
+                <div class="flex justify-start mb-4 animate-fade-in-up">
+                    <div class="w-8 h-8 rounded-full bg-blue-400 text-white flex items-center justify-center mr-2 text-xs overflow-hidden flex-none shadow-md">
+                        <i class="fas fa-cloud-sun"></i>
+                    </div>
+                    <div class="max-w-[85%] sm:max-w-[320px]">
+                        <div class="flex items-baseline space-x-2 mb-1 text-left">
+                            <span class="text-xs text-gray-500 font-medium">${data.nickname}</span>
+                            <span class="text-[10px] text-gray-400">${data.time}</span>
+                        </div>
+                        <div class="bg-gradient-to-br from-blue-400 to-blue-600 text-white shadow-md chat-bubble-left overflow-hidden rounded-xl p-4">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 class="font-bold text-xl">${data.city}</h3>
+                                    <p class="text-xs opacity-80">${data.date} ${data.week}</p>
+                                </div>
+                                <div class="text-4xl opacity-90">
+                                    <i class="fas fa-cloud-sun"></i>
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <p class="text-3xl font-bold">${data.weather}</p>
+                            </div>
+                            <div class="flex flex-col space-y-1 text-sm opacity-90 bg-white/10 p-2 rounded-lg">
+                                <div class="flex items-center">
+                                    <i class="fas fa-temperature-high w-6 text-center mr-2"></i>
+                                    <span>${data.temp_low}°C ~ ${data.temp_high}°C</span>
+                                </div>
+                                <div class="flex items-center">
+                                    <i class="fas fa-wind w-6 text-center mr-2"></i>
+                                    <span>${data.wind}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            $('#messages').append(html);
+            scrollToBottom();
+        });
+
         // Update User List
         socket.on('update_user_list', (data) => {
             const list = $('#user-list');

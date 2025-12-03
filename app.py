@@ -8,9 +8,15 @@ from openai import OpenAI
 import uuid
 import datetime
 
+import requests
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app, cors_allowed_origins="*")
+# Explicitly set async_mode to 'eventlet' or 'threading' to help PyInstaller environment
+# 'threading' is safer for basic exe packaging if eventlet has issues, but we prefer eventlet for performance if possible.
+# Let's try 'threading' first as it is most compatible with PyInstaller without complex hooks.
+# If high concurrency is needed, we can revisit eventlet hooks.
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # Initialize OpenAI Client
 client = OpenAI(api_key=AI_CONFIG['api_key'], base_url=AI_CONFIG['base_url'])
@@ -85,7 +91,7 @@ def handle_message(data):
     is_private_command = False
 
     # Check if it is a private command
-    if msg_content.strip().startswith('@电影') or msg_content.strip().startswith('@成小理'):
+    if msg_content.strip().startswith('@电影') or msg_content.strip().startswith('@成小理') or msg_content.strip() == '@音乐一下' or msg_content.strip().startswith('@天气'):
         is_private_command = True
     
     # Echo message (Broadcast if public, private if command)
@@ -93,6 +99,79 @@ def handle_message(data):
         emit('message', data)
     else:
         emit('message', data, broadcast=True)
+
+    # Check for @天气
+    if msg_content.strip().startswith('@天气'):
+        city = msg_content.replace('@天气', '').strip()
+        if not city:
+            emit('system_message', {'msg': '请提供城市名称，例如：@天气 成都'})
+            return
+
+        try:
+            api_key = "97c99a148fd06528"
+            weather_url = f"https://v2.xxapi.cn/api/weatherDetails?city={city}&key={api_key}"
+            response = requests.get(weather_url, headers={'User-Agent': 'xiaoxiaoapi/1.0.0'})
+            
+            if response.status_code == 200:
+                res_json = response.json()
+                if res_json.get('code') == 200 and res_json.get('data'):
+                    weather_data_all = res_json.get('data', {})
+                    forecast_data = weather_data_all.get('data', [])
+                    
+                    if forecast_data and len(forecast_data) > 0:
+                        today_weather = forecast_data[0]
+                        emit('weather_message', {
+                            'nickname': '天气小助手',
+                            'time': datetime.datetime.now().strftime('%H:%M'),
+                            'city': weather_data_all.get('city', city),
+                            'date': today_weather.get('date', ''),
+                            'week': today_weather.get('day', ''),
+                            'weather': today_weather.get('weather_from', ''),
+                            'temp_low': today_weather.get('low_temp', ''),
+                            'temp_high': today_weather.get('high_temp', ''),
+                            'wind': today_weather.get('wind_from', '') + ' ' + today_weather.get('wind_level_from', '')
+                        })
+                    else:
+                        emit('system_message', {'msg': '未获取到天气详情数据'})
+                else:
+                     emit('system_message', {'msg': f'天气获取失败: {res_json.get("msg", "城市可能有误")}'})
+            else:
+                emit('system_message', {'msg': '天气API请求失败'})
+
+        except Exception as e:
+            print(f"Weather Error: {e}")
+            emit('system_message', {'msg': f'天气功能出错: {str(e)}'})
+        return
+
+    # Check for @音乐一下
+    if msg_content.strip() == '@音乐一下':
+        try:
+            # music_api_url = "https://v2.xxapi.cn/api/randomkuwo"
+            music_api_url = "https://api.qqsuu.cn/api/dm-randmusic?sort=%E7%83%AD%E6%AD%8C%E6%A6%9C&format=json"
+            response = requests.get(music_api_url)
+            
+            if response.status_code == 200:
+                res_json = response.json()
+                # Check if the new API returns code 1 for success
+                if res_json.get('code') == 1:
+                    music_data = res_json.get('data', {})
+                    emit('music_message', {
+                        'nickname': '系统',
+                        'time': datetime.datetime.now().strftime('%H:%M'),
+                        'name': music_data.get('name', '未知歌曲'),
+                        'singer': music_data.get('artistsname', '未知歌手'),
+                        'url': music_data.get('url', ''),
+                        'image': music_data.get('picurl', '')
+                    })
+                else:
+                    emit('system_message', {'msg': f'音乐获取失败: {res_json.get("msg", "未知错误")}'})
+            else:
+                emit('system_message', {'msg': '音乐API请求失败'})
+                
+        except Exception as e:
+            print(f"Music Error: {e}")
+            emit('system_message', {'msg': f'音乐功能出错: {str(e)}'})
+        return
 
     # Check for @电影
     if msg_content.strip().startswith('@电影'):
@@ -134,6 +213,7 @@ def handle_message(data):
 功能：
 --可以回答与成都理工大学有关的任何问题。
 --可以生成七言绝句类型的古诗。
+--可以随机播放音乐，通过@音乐一下 向聊天界面发送指令。
 --可以根据用户输入的信息生成请假条，需要用户提供姓名、专业、班级、事由等信息，如果没有，提示补全后再生成，格式如下：
 ```
 老师您好：
